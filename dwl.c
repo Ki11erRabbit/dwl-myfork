@@ -129,11 +129,11 @@ struct Client {
 #endif
 	unsigned int bw;
 	uint32_t tags;
-	int isfloating, isurgent, isfullscreen, isterm, noswallow;;
+	int isfloating, isurgent, isfullscreen, isterm, noswallow;
 	uint32_t resize; /* configure serial of a pending resize */
     pid_t pid;
-    Client *swallowing, *swallowedby;
-} Client;
+    struct Client *swallowing, *swallowedby;
+};
 
 typedef struct {
 	uint32_t mod;
