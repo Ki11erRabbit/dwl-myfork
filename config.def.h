@@ -21,11 +21,11 @@ static const int allow_constrain      = 1;
 static const int tagcount = 9;
 
 static const Rule rules[] = {
-	/* app_id     title       tags mask     isfloating   monitor */
+	/* app_id     title       tags mask     isfloating  isterm  noswallow  monitor */
 	/* examples:
-	{ "Gimp",     NULL,       0,            1,           -1 },
+	{ "Gimp",     NULL,       0,            1,          0,      1,         -1 },
 	*/
-	{ "firefox",  NULL,       1 << 8,       0,           -1 },
+	{ "firefox",  NULL,       1 << 8,       0,          0,      1,         -1 },
 };
 
 /* layout(s) */
