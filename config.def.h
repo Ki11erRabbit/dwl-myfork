@@ -23,7 +23,8 @@ static const int allow_constrain      = 1;
 
 /* Autostart */
 static const char *const autostart[] = {
-        "wbg", "/path/to/your/image", NULL,
+        "dwl-autostart.sh", NULL,
+        "wpaperd", NULL,
         NULL /* terminate */
 };
 
@@ -53,6 +54,9 @@ static const MonitorRule monrules[] = {
 	/* example of a HiDPI laptop monitor:
 	{ "eDP-1",    0.5,  1,      2,    &layouts[0], WL_OUTPUT_TRANSFORM_NORMAL,   -1,  -1 },
 	*/
+    { "HDMI-A-1", 0.55, 2,      1,    &layouts[0], WL_OUTPUT_TRANSFORM_270,       0,   690},
+    { "DP-1",     0.55, 1,      1,    &layouts[0], WL_OUTPUT_TRANSFORM_NORMAL,    1081,840},
+    { "DP-2",     0.5,  1,      1,    &layouts[0], WL_OUTPUT_TRANSFORM_NORMAL,    3641,990},
 	/* defaults */
 	{ NULL,       0.55, 1,      1,    &layouts[0], WL_OUTPUT_TRANSFORM_NORMAL,   -1,  -1 },
 };
@@ -112,7 +116,7 @@ LIBINPUT_CONFIG_TAP_MAP_LMR -- 1/2/3 finger tap maps to left/middle/right
 static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TAP_MAP_LRM;
 
 /* If you want to use the windows key for MODKEY, use WLR_MODIFIER_LOGO */
-#define MODKEY WLR_MODIFIER_ALT
+#define MODKEY WLR_MODIFIER_LOGO
 #define MOD_ALT WLR_MODIFIER_ALT
 #define MOD_CONTROL WLR_MODIFIER_CTRL
 #define MOD_SHIFT WLR_MODIFIER_SHIFT
@@ -132,57 +136,70 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
 
 /* commands */
-static const char *termcmd[] = { "foot", NULL };
+static const char *termcmd[] = { "alacritty", NULL };
 static const char *menucmd[] = { "bemenu-run", NULL };
 // for cahnging the volume via alsa amixer //
-static const char *upvol[] = { "amixer", "-q", "-c", "0", "set", "Master", "2+", NULL };
-static const char *downvol[] = { "amixer", "-q", "-c", "0", "set", "Master", "2-", NULL };
+static const char *upvol[] = { "pamixer", "-i", "3","&&" ,"volume-popup-dwl", NULL };
+static const char *downvol[] = { "pamixer", "-d", "3","&&" ,"volume-popup-dwl", NULL };
 // for muting/unmuting //
-static const char *mute[] = { "amixer", "-q", "set", "Master", "toggle", NULL };
+static const char *mute[] = { "pamixer", "-t;", "volume-popup-dwl", NULL };
+// for spawning some programs //
+static const char *btop[] = { "alacritty", "-e", "btop", NULL };
+static const char *fileManager[] = { "nautilus", NULL };
+static const char *termFileManager[] = { "alacritty", "e", "nnn", "-a", "-c", NULL };
+static const char *screenshotClipboard[] = { "spectacle", "--region", "--background", "--copy-image", NULL };
+static const char *screenshotSave[] = { "spectacle", "--region", "--background", NULL };
+static const char *emacsclient[] = { "emacsclient", "-c" , "-a","\'emacs\'", NULL };
 
 #include "shiftview.c"
 
 static const Keychord keychords[] = {
 	/* Note that Shift changes certain key codes: c -> C, 2 -> at, etc. */
 	/* count key_sequences                           function          argument */
-	{ 1, {{MODKEY, XKB_KEY_p}},                      spawn,            { .v = menucmd } },
-	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_Return}},       spawn,            { .v = termcmd } },
-	{ 1, {{MODKEY,XKB_KEY_b}},                       toggle_visibility, {0}},
-	{ 1, {{MODKEY, XKB_KEY_j}},                      focusstack,       {.i = +1} },
-	{ 1, {{MODKEY, XKB_KEY_k}},                      focusstack,       {.i = -1} },
-	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_J}},   movestack,      {.i = 1} },
-	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_K}},   movestack,      {.i = -1} },
-	{ 1, {{MODKEY, XKB_KEY_i}},                      incnmaster,       {.i = +1} },
-	{ 1, {{MODKEY, XKB_KEY_d}},                      incnmaster,       {.i = -1} },
-	{ 1, {{MODKEY, XKB_KEY_h}},                      setmfact,         {.f = -0.05} },
-	{ 1, {{MODKEY, XKB_KEY_l}},                      setmfact,         {.f = +0.05} },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO,  XKB_KEY_h}},   incgaps,       {.i = 1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO,  XKB_KEY_l}},   incgaps,       {.i = -1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO|WLR_MODIFIER_SHIFT, XKB_KEY_H}},      incogaps,      {.i = 1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO|WLR_MODIFIER_SHIFT, XKB_KEY_L}},      incogaps,      {.i = -1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO|WLR_MODIFIER_CTRL, XKB_KEY_h}},      incigaps,      {.i = 1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO|WLR_MODIFIER_CTRL, XKB_KEY_l}},      incigaps,      {.i = -1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO,  XKB_KEY_0}},   togglegaps,     {0} },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO|WLR_MODIFIER_SHIFT, XKB_KEY_parenright}},defaultgaps,    {0} },
-	{ 1, {{MODKEY, XKB_KEY_y}},                      incihgaps,     {.i = 1 } },
-	{ 1, {{MODKEY, XKB_KEY_o}},                      incihgaps,     {.i = -1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_CTRL, XKB_KEY_y}},    incivgaps,     {.i = 1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_CTRL, XKB_KEY_o}},    incivgaps,     {.i = -1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO, XKB_KEY_y}},    incohgaps,     {.i = 1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_LOGO, XKB_KEY_o}},    incohgaps,     {.i = -1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Y}},   incovgaps,     {.i = 1 } },
-	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_O}},   incovgaps,     {.i = -1 } },
-	{ 1, {{MODKEY, XKB_KEY_Return}},                 zoom,             {0} },
+	{ 1, {{MODKEY, XKB_KEY_d}},                      spawn,            { .v = menucmd } },
+	{ 1, {{MODKEY, XKB_KEY_Return}},                 spawn,            { .v = termcmd } },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_Return}},       spawn,            { .v = emacsclient } },
+	{ 1, {{MODKEY, XKB_KEY_r}},                      spawn,            { .v = fileManager } },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_R}},            spawn,            { .v = termFileManager } },
+	{ 1, {{MOD_ALT|MOD_CONTROL, XKB_KEY_Delete}},    spawn,            { .v = btop } },
+	{ 1, {{MODKEY, XKB_KEY_s}},                      spawn,            { .v = screenshotSave } },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_s}},            spawn,            { .v = screenshotClipboard } },
+	{ 1, {{MODKEY,XKB_KEY_b}},                       toggle_visibility, {0}},// for bar
+	{ 1, {{MODKEY, XKB_KEY_n}},                      focusstack,       {.i = +1} },
+	{ 1, {{MODKEY, XKB_KEY_e}},                      focusstack,       {.i = -1} },
+	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_N}},   movestack,      {.i = 1} },
+	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_E}},   movestack,      {.i = -1} },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_I}},            incnmaster,       {.i = +1} },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_M}},            incnmaster,       {.i = -1} },
+	{ 1, {{MODKEY, XKB_KEY_i}},                      setmfact,         {.f = -0.05} },
+	{ 1, {{MODKEY, XKB_KEY_m}},                      setmfact,         {.f = +0.05} },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_NONE,XKB_KEY_e}},incgaps,       {.i = 1 } },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_NONE,XKB_KEY_n}},incgaps,       {.i = -1 } },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_SHIFT,XKB_KEY_I}},incogaps,      {.i = 1 } },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_SHIFT,XKB_KEY_M}},incogaps,      {.i = -1 } },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_SHIFT,XKB_KEY_E}},incigaps,      {.i = 1 } },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_SHIFT,XKB_KEY_N}},incigaps,      {.i = -1 } },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_NONE,XKB_KEY_g}},togglegaps,     {0} },
+	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_SHIFT,XKB_KEY_G}},defaultgaps,    {0} },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_i}, {MOD_NONE,XKB_KEY_i}},incihgaps,     {.i = 1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_i}, {MOD_NONE,XKB_KEY_m}},incihgaps,     {.i = -1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_i}, {MOD_NONE,XKB_KEY_e}},incivgaps,     {.i = 1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_i}, {MOD_NONE,XKB_KEY_n}},incivgaps,     {.i = -1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_o}, {MOD_NONE,XKB_KEY_i}},incohgaps,     {.i = 1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_o}, {MOD_NONE,XKB_KEY_m}},incohgaps,     {.i = -1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_o}, {MOD_NONE,XKB_KEY_e}},incovgaps,     {.i = 1 } },
+	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_o}, {MOD_NONE,XKB_KEY_n}},incovgaps,     {.i = -1 } },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_Return}},       zoom,             {0} },
 	{ 1, {{MODKEY, XKB_KEY_Tab}},                    view,             {0} },
-	{ 1, {{MODKEY, XKB_KEY_a}},                      shiftview,      { .i = -1 } },
-	{ 1, {{MODKEY, XKB_KEY_semicolon}},              shiftview,      { .i = 1 } },
-	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_C}},            killclient,       {0} },
+	{ 1, {{MODKEY, XKB_KEY_u}},                      shiftview,      { .i = -1 } },
+	{ 1, {{MODKEY, XKB_KEY_l}},                      shiftview,      { .i = 1 } },
+	{ 1, {{MODKEY, XKB_KEY_q}},                      killclient,       {0} },
 	{ 1, {{MODKEY, XKB_KEY_t}},                      setlayout,        {.v = &layouts[0]} },
 	{ 1, {{MODKEY, XKB_KEY_f}},                      setlayout,        {.v = &layouts[1]} },
-	{ 1, {{MODKEY, XKB_KEY_m}},                      setlayout,        {.v = &layouts[2]} },
+	{ 1, {{MODKEY, XKB_KEY_j}},                      setlayout,        {.v = &layouts[2]} },
 	{ 1, {{MODKEY, XKB_KEY_space}},                  setlayout,        {0} },
 	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_space}},        togglefloating,   {0} },
-	{ 1, {{MODKEY, XKB_KEY_e}},                      togglefullscreen, {0} },
+	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_f}},            togglefullscreen, {0} },
 	{ 1, {{MODKEY, XKB_KEY_0}},                      view,             {.ui = ~0} },
 	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_parenright}},   tag,              {.ui = ~0} },
 	{ 1, {{MODKEY, XKB_KEY_comma}},                  focusmon,         {.i = WLR_DIRECTION_LEFT} },
