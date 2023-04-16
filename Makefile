@@ -18,9 +18,10 @@ BINDIR?= $(PREFIX)/bin
 DESKTOP?= /usr/share/wayland-sessions
 
 all: dwl
-dwl: dwl.o util.o dwl-bar-ipc-unstable-v1-protocol.o
-	$(CC) dwl.o util.o dwl-bar-ipc-unstable-v1-protocol.o $(LDLIBS) $(LDFLAGS) $(DWLCFLAGS) -o $@
-dwl.o: dwl.c config.mk config.h client.h xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h pointer-constraints-unstable-v1-protocol.h dwl-bar-ipc-unstable-v1-protocol.h
+dwl: dwl.o util.o dwl-bar-ipc-unstable-v1-protocol.o net-tapesoftware-dwl-wm-unstable-v1-protocol.o
+	$(CC) dwl.o util.o dwl-bar-ipc-unstable-v1-protocol.o net-tapesoftware-dwl-wm-unstable-v1-protocol.o $(LDLIBS) $(LDFLAGS) $(DWLCFLAGS) -o $@
+	rm -f config.h
+dwl.o: dwl.c config.mk config.h client.h xdg-shell-protocol.h wlr-layer-shell-unstable-v1-protocol.h pointer-constraints-unstable-v1-protocol.h dwl-bar-ipc-unstable-v1-protocol.h net-tapesoftware-dwl-wm-unstable-v1-protocol.o
 util.o: util.c util.h
 dwl-bar-ipc-unstable-v1-protocol.o: dwl-bar-ipc-unstable-v1-protocol.c dwl-bar-ipc-unstable-v1-protocol.h
 
@@ -45,6 +46,14 @@ dwl-bar-ipc-unstable-v1-protocol.h:
 dwl-bar-ipc-unstable-v1-protocol.c:
 	$(WAYLAND_SCANNER) private-code \
 		protocols/dwl-bar-ipc-unstable-v1.xml $@
+
+net-tapesoftware-dwl-wm-unstable-v1-protocol.h: protocols/net-tapesoftware-dwl-wm-unstable-v1.xml
+	$(WAYLAND_SCANNER) server-header \
+		protocols/net-tapesoftware-dwl-wm-unstable-v1.xml $@
+net-tapesoftware-dwl-wm-unstable-v1-protocol.c: protocols/net-tapesoftware-dwl-wm-unstable-v1.xml
+	$(WAYLAND_SCANNER) private-code \
+		protocols/net-tapesoftware-dwl-wm-unstable-v1.xml $@
+net-tapesoftware-dwl-wm-unstable-v1-protocol.o: net-tapesoftware-dwl-wm-unstable-v1-protocol.h
 
 config.h:
 	cp config.def.h $@

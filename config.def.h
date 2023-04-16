@@ -10,8 +10,10 @@ static const unsigned int gappih           = 10; /* horiz inner gap between wind
 static const unsigned int gappiv           = 10; /* vert inner gap between windows */
 static const unsigned int gappoh           = 10; /* horiz outer gap between windows and screen edge */
 static const unsigned int gappov           = 10; /* vert outer gap between windows and screen edge */
-static const float bordercolor[]           = {0.5, 0.5, 0.5, 1.0};
-static const float focuscolor[]            = {1.0, 0.0, 0.0, 1.0};
+/*static const float bordercolor[]    = {0.5, 0.5, 0.5, 1.0};
+static const float focuscolor[]     = {1.0, 0.0, 0.0, 1.0};*/
+static const float bordercolor[]    = {0.157,0.173,0.204, 1.0};
+static const float focuscolor[]     = {0.318,0.686,0.937, 1.0};
 static const char *cursortheme            = NULL; /* theme from /usr/share/cursors/xorg-x11 */
 static const unsigned int cursorsize       = 24;
 /* To conform the xdg-protocol, set the alpha to zero to restore the old behavior */
