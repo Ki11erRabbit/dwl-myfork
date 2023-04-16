@@ -1,7 +1,7 @@
 #include <X11/XF86keysym.h>
 /* appearance */
 static const int sloppyfocus               = 1;  /* focus follows mouse */
-static const int mousefollowsfocus         = 1;  /* mouse follows focus */
+static const int mousefollowsfocus         = 0;  /* mouse follows focus */
 static const int bypass_surface_visibility = 0;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
 static const int smartgaps                 = 0;  /* 1 means no outer gap when there is only one window */
 static const int monoclegaps               = 0;  /* 1 means outer gaps in monocle layout */
@@ -23,7 +23,6 @@ static const int allow_constrain      = 1;
 
 /* Autostart */
 static const char *const autostart[] = {
-        "dwl-autostart.sh", NULL,
         "wpaperd", NULL,
         NULL /* terminate */
 };
@@ -37,7 +36,7 @@ static const Rule rules[] = {
 	/* examples:
 	{ "Gimp",     NULL,       0,            1,          0,      1,         -1 },
 	*/
-	{ "firefox",  NULL,       1 << 8,       0,          0,      1,         -1 },
+	{ "firefox",  NULL,       0,       0,          0,      1,         -1 },
 };
 
 /* layout(s) */
@@ -171,8 +170,8 @@ static const Keychord keychords[] = {
 	{ 1, {{MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_E}},   movestack,      {.i = -1} },
 	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_I}},            incnmaster,       {.i = +1} },
 	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_M}},            incnmaster,       {.i = -1} },
-	{ 1, {{MODKEY, XKB_KEY_i}},                      setmfact,         {.f = -0.05} },
-	{ 1, {{MODKEY, XKB_KEY_m}},                      setmfact,         {.f = +0.05} },
+	{ 1, {{MODKEY, XKB_KEY_m}},                      setmfact,         {.f = -0.05} },
+	{ 1, {{MODKEY, XKB_KEY_i}},                      setmfact,         {.f = +0.05} },
 	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_NONE,XKB_KEY_e}},incgaps,       {.i = 1 } },
 	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_NONE,XKB_KEY_n}},incgaps,       {.i = -1 } },
 	{ 2, {{MODKEY, XKB_KEY_g}, {MOD_SHIFT,XKB_KEY_I}},incogaps,      {.i = 1 } },
