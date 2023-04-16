@@ -13,6 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
+#include <wayland-util.h>
 #include <wlr/backend.h>
 #include <wlr/backend/libinput.h>
 #include <wlr/render/allocator.h>
@@ -55,6 +56,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
+#include "dwl-bar-ipc-unstable-v1-protocol.h"
 #ifdef XWAYLAND
 #include <wlr/xwayland.h>
 #include <X11/Xlib.h>
@@ -179,9 +181,16 @@ typedef struct {
 	void (*arrange)(Monitor *);
 } Layout;
 
+typedef struct {
+	struct wl_list link;
+	struct wl_resource* resource;
+	Monitor *monitor;
+} DwlOutput;
+
 struct Monitor {
 	struct wl_list link;
 	struct wlr_output *wlr_output;
+	struct wl_list dwl_outputs;
 	struct wlr_scene_output *scene_output;
 	struct wlr_scene_rect *fullscreen_bg; /* See createmon() for info */
 	struct wl_listener frame;
@@ -281,6 +290,17 @@ static void destroysessionlock(struct wl_listener *listener, void *data);
 static void destroysessionmgr(struct wl_listener *listener, void *data);
 static void destroypointerconstraint(struct wl_listener *listener, void *data);
 static Monitor *dirtomon(enum wlr_direction dir);
+static void dwl_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id);
+static void dwl_manager_destroy(struct wl_resource* resource);
+static void dwl_manager_get_output(struct wl_client *client, struct wl_resource *resource, uint32_t id, struct wl_resource *output);
+static void dwl_manager_release(struct wl_client *client, struct wl_resource *resource);
+static void dwl_output_destroy(struct wl_resource *resource);
+static void dwl_output_set_client_tags(struct wl_client *client, struct wl_resource *resource, uint32_t and_tags, uint32_t xor_tags);
+static void dwl_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index);
+static void dwl_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset);
+static void dwl_output_printstatus(Monitor* monitor);
+static void dwl_output_printstatus_to(Monitor* monitor, DwlOutput *output);
+static void dwl_output_release(struct wl_client *client, struct wl_resource *resource);
 static void focusclient(Client *c, int lift);
 static void focusmon(const Arg *arg);
 static void focusstack(const Arg *arg);
@@ -344,6 +364,7 @@ static void togglefullscreen(const Arg *arg);
 static void togglegaps(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
+static void toggle_visibility(const Arg *arg);
 static void unlocksession(struct wl_listener *listener, void *data);
 static void unmaplayersurfacenotify(struct wl_listener *listener, void *data);
 static void unmapnotify(struct wl_listener *listener, void *data);
@@ -421,6 +442,8 @@ static struct wl_listener cursor_frame = {.notify = cursorframe};
 static struct wl_listener cursor_motion = {.notify = motionrelative};
 static struct wl_listener cursor_motion_absolute = {.notify = motionabsolute};
 static struct wl_listener drag_icon_destroy = {.notify = destroydragicon};
+static struct zdwl_manager_v1_interface dwl_manager_implementation = {.get_output = dwl_manager_get_output, .release = dwl_manager_release};
+static struct zdwl_output_v1_interface dwl_output_implementation = {.release = dwl_output_release, .set_client_tags = dwl_output_set_client_tags, .set_tags = dwl_output_set_tags, .set_layout = dwl_output_set_layout};
 static struct wl_listener idle_inhibitor_create = {.notify = createidleinhibitor};
 static struct wl_listener idle_inhibitor_destroy = {.notify = destroyidleinhibitor};
 static struct wl_listener layout_change = {.notify = updatemons};
@@ -780,6 +803,7 @@ cleanupkeyboard(struct wl_listener *listener, void *data)
 void
 cleanupmon(struct wl_listener *listener, void *data)
 {
+	DwlOutput *output, *output_tmp;
 	Monitor *m = wl_container_of(listener, m, destroy);
 	LayerSurface *l, *tmp;
 	int i;
@@ -795,6 +819,11 @@ cleanupmon(struct wl_listener *listener, void *data)
 	wlr_output_layout_remove(output_layout, m->wlr_output);
 	wlr_scene_output_destroy(m->scene_output);
 	wlr_scene_node_destroy(&m->fullscreen_bg->node);
+
+	wl_list_for_each_safe(output, output_tmp, &m->dwl_outputs, link) {
+		wl_resource_set_user_data(output->resource, NULL);
+		free(output);
+	}
 
 	closemon(m);
 	free(m);
@@ -1001,6 +1030,7 @@ createmon(struct wl_listener *listener, void *data)
 	Monitor *m = wlr_output->data = ecalloc(1, sizeof(*m));
 	m->wlr_output = wlr_output;
 
+	wl_list_init(&m->dwl_outputs);
 	wlr_output_init_render(wlr_output, alloc, drw);
 
 	/* Initialize monitor state using configured rules */
@@ -1359,6 +1389,198 @@ dirtomon(enum wlr_direction dir)
 			selmon->wlr_output, selmon->m.x, selmon->m.y)))
 		return next->data;
 	return selmon;
+}
+
+void
+dwl_manager_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
+{
+	int i;
+	struct wl_resource* resource = wl_resource_create(client, &zdwl_manager_v1_interface, version, id);
+	if (!resource) {
+		wl_client_post_no_memory(client);
+		return;
+	}
+
+	wl_resource_set_implementation(resource, &dwl_manager_implementation, NULL, dwl_manager_destroy);
+
+	for (i = 0; i < LENGTH(tags); i++) {
+		zdwl_manager_v1_send_tag(resource, tags[i]);
+	}
+
+	for (i = 0; i < LENGTH(layouts); i++) {
+		zdwl_manager_v1_send_layout(resource, layouts[i].symbol);
+	}
+}
+
+void dwl_manager_destroy(struct wl_resource* resource) {/* No state to destroy */}
+
+void
+dwl_manager_get_output(struct wl_client *client, struct wl_resource *resource, uint32_t id, struct wl_resource *output)
+{
+	DwlOutput* dwl_output;
+	Monitor* monitor = wlr_output_from_resource(output)->data;
+	struct wl_resource* dwl_output_resource = wl_resource_create(client, &zdwl_output_v1_interface, wl_resource_get_version(resource), id);
+	if (!dwl_output_resource) {
+		wl_client_post_no_memory(client);
+		return;
+	}
+
+	dwl_output = ecalloc(1, sizeof(*dwl_output));
+	dwl_output->resource = dwl_output_resource;
+	dwl_output->monitor = monitor;
+
+	wl_resource_set_implementation(dwl_output_resource, &dwl_output_implementation, dwl_output, dwl_output_destroy);
+	wl_list_insert(&monitor->dwl_outputs, &dwl_output->link);
+
+	dwl_output_printstatus_to(monitor, dwl_output);
+}
+
+void
+dwl_manager_release(struct wl_client *client, struct wl_resource *resource)
+{
+	wl_resource_destroy(resource);
+}
+
+void
+dwl_output_destroy(struct wl_resource *resource)
+{
+	DwlOutput *output = wl_resource_get_user_data(resource);
+	if (output) {
+		wl_list_remove(&output->link);
+		free(output);
+	}
+}
+
+void
+dwl_output_set_client_tags(struct wl_client *client, struct wl_resource *resource, uint32_t and_tags, uint32_t xor_tags)
+{
+	DwlOutput *output;
+	Client *selected_client;
+	unsigned int newtags;
+
+	output = wl_resource_get_user_data(resource);
+	if (!output)
+		return;
+
+	selected_client = focustop(output->monitor);
+	if (!selected_client)
+		return;
+
+	newtags = (selected_client->tags & and_tags) ^ xor_tags;
+	if (!newtags)
+        return;
+
+    selected_client->tags = newtags;
+    focusclient(focustop(selmon), 1);
+    arrange(selmon);
+}
+
+void
+dwl_output_set_layout(struct wl_client *client, struct wl_resource *resource, uint32_t index)
+{
+	DwlOutput *output;
+	Monitor *monitor;
+
+	if (index >= LENGTH(layouts))
+		return;
+
+	output = wl_resource_get_user_data(resource);
+	if (!output)
+		return;
+
+	monitor = output->monitor;
+	if (!monitor)
+		return;
+
+	if (index != monitor->lt[monitor->sellt] - layouts)
+		monitor->sellt ^= 1;
+
+    monitor->lt[monitor->sellt] = &layouts[index];
+	arrange(monitor);
+	printstatus();
+}
+
+void
+dwl_output_set_tags(struct wl_client *client, struct wl_resource *resource, uint32_t tagmask, uint32_t toggle_tagset)
+{
+	DwlOutput *output;
+	Monitor *monitor;
+
+	output = wl_resource_get_user_data(resource);
+	if (!output)
+		return;
+
+	monitor = output->monitor;
+	if (!monitor)
+		return;
+
+	if ((tagmask & TAGMASK) == monitor->tagset[monitor->seltags])
+		return;
+	if (toggle_tagset)
+		monitor->seltags ^= 1;
+	if (tagmask & TAGMASK)
+		monitor->tagset[monitor->seltags] = tagmask & TAGMASK;
+
+	focusclient(focustop(monitor), 1);
+	arrange(monitor);
+	printstatus();
+}
+
+void
+dwl_output_printstatus(Monitor* monitor)
+{
+	DwlOutput *output;
+	wl_list_for_each(output, &monitor->dwl_outputs, link) {
+		dwl_output_printstatus_to(monitor, output);
+	}
+}
+
+void
+dwl_output_printstatus_to(Monitor* monitor, DwlOutput *output)
+{
+	Client *c, *focused;
+	int tagmask, state, numclients, focused_client, tag;
+    const char *title, *appid;
+	focused = focustop(monitor);
+	zdwl_output_v1_send_active(output->resource, monitor == selmon);
+
+	for ( tag = 0 ; tag < LENGTH(tags); tag++) {
+		numclients = state = focused_client = 0;
+		tagmask = 1 << tag;
+		if ((tagmask & monitor->tagset[monitor->seltags]) != 0)
+			state |= ZDWL_OUTPUT_V1_TAG_STATE_ACTIVE;
+
+		wl_list_for_each(c, &clients, link) {
+			if (c->mon != monitor)
+				continue;
+			if (!(c->tags & tagmask))
+				continue;
+			if (c == focused)
+				focused_client = 1;
+			if (c->isurgent)
+				state |= ZDWL_OUTPUT_V1_TAG_STATE_URGENT;
+
+			numclients++;
+		}
+		zdwl_output_v1_send_tag(output->resource, tag, state, numclients, focused_client);
+	}
+    title = focused ? client_get_title(focused) : "";
+
+    zdwl_output_v1_send_layout(output->resource, monitor->lt[monitor->sellt] - layouts);
+    zdwl_output_v1_send_title(output->resource, title ? title : broken);
+    if (wl_resource_get_version(output->resource) >= ZDWL_OUTPUT_V1_APPID_SINCE_VERSION) { /* Don't break clients using version 1 */
+        appid = focused ? client_get_appid(focused) : "";
+        zdwl_output_v1_send_appid(output->resource, appid ? appid : broken);
+    }
+    if (wl_resource_get_version(output->resource) >= ZDWL_OUTPUT_V1_LAYOUT_SYMBOL_SINCE_VERSION) /* Don't break clients using version 2 or below */
+        zdwl_output_v1_send_layout_symbol(output->resource, monitor->ltsymbol);
+    zdwl_output_v1_send_frame(output->resource);
+}
+
+void
+dwl_output_release(struct wl_client *client, struct wl_resource *resource)
+{
+	wl_resource_destroy(resource);
 }
 
 void
@@ -2217,6 +2439,7 @@ printstatus(void)
 		printf("%s tags %u %u %u %u\n", m->wlr_output->name, occ, m->tagset[m->seltags],
 				sel, urg);
 		printf("%s layout %s\n", m->wlr_output->name, m->ltsymbol);
+		dwl_output_printstatus(m);
 	}
 	fflush(stdout);
 }
@@ -2664,6 +2887,7 @@ setup(void)
 	wl_signal_add(&output_mgr->events.test, &output_mgr_test);
 
 	wlr_scene_set_presentation(scene, wlr_presentation_create(dpy, backend));
+	wl_global_create(dpy, &zdwl_manager_v1_interface, 3, NULL, dwl_manager_bind);
 
 #ifdef XWAYLAND
 	/*
@@ -2875,6 +3099,15 @@ toggleview(const Arg *arg)
 		arrange(selmon);
 	}
 	printstatus();
+}
+
+void
+toggle_visibility(const Arg* arg)
+{
+	DwlOutput* output;
+	wl_list_for_each(output, &selmon->dwl_outputs, link) {
+		zdwl_output_v1_send_toggle_visibility(output->resource);
+	}
 }
 
 void

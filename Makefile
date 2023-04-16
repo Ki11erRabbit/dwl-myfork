@@ -38,11 +38,17 @@ pointer-constraints-unstable-v1-protocol.h:
 wlr-layer-shell-unstable-v1-protocol.h:
 	$(WAYLAND_SCANNER) server-header \
 		protocols/wlr-layer-shell-unstable-v1.xml $@
+dwl-bar-ipc-unstable-v1-protocol.h:
+	$(WAYLAND_SCANNER) server-header \
+		protocols/dwl-bar-ipc-unstable-v1.xml $@
+dwl-bar-ipc-unstable-v1-protocol.c:
+	$(WAYLAND_SCANNER) private-code \
+		protocols/dwl-bar-ipc-unstable-v1.xml $@
 
 config.h:
 	cp config.def.h $@
 clean:
-	rm -f dwl *.o *-protocol.h
+	rm -f dwl *.o *-protocol.*
 
 dist: clean
 	mkdir -p dwl-$(VERSION)
