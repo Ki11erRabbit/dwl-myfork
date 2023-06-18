@@ -5,7 +5,7 @@ static const int mousefollowsfocus         = 0;  /* mouse follows focus */
 static const int bypass_surface_visibility = 0;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
 static const int smartgaps                 = 0;  /* 1 means no outer gap when there is only one window */
 static const int monoclegaps               = 0;  /* 1 means outer gaps in monocle layout */
-static const unsigned int borderpx         = 1;  /* border pixel of windows */
+static const unsigned int borderpx         = 2;  /* border pixel of windows */
 static const unsigned int gappih           = 10; /* horiz inner gap between windows */
 static const unsigned int gappiv           = 10; /* vert inner gap between windows */
 static const unsigned int gappoh           = 10; /* horiz outer gap between windows and screen edge */
@@ -25,7 +25,11 @@ static const int allow_constrain      = 1;
 
 /* Autostart */
 static const char *const autostart[] = {
+        "dwl-autostart.sh", NULL,
         "wpaperd", NULL,
+        "startup-bar", NULL,
+        "swaync", NULL,
+        "usb-watcher", NULL,
         NULL /* terminate */
 };
 
@@ -39,6 +43,7 @@ static const Rule rules[] = {
 	{ "Gimp",     NULL,       0,            1,          0,      1,         -1 },
 	*/
 	{ "firefox",  NULL,       0,       0,          0,      1,         -1 },
+	{ "alacritty",  NULL,       0,       0,          0,      0,         -1 },
 };
 
 /* layout(s) */
@@ -148,8 +153,10 @@ static const char *mute[] = { "pamixer", "-t;", "volume-popup-dwl", NULL };
 static const char *btop[] = { "alacritty", "-e", "btop", NULL };
 static const char *fileManager[] = { "nautilus", NULL };
 static const char *termFileManager[] = { "alacritty", "e", "nnn", "-a", "-c", NULL };
-static const char *screenshotClipboard[] = { "spectacle", "--region", "--background", "--copy-image", NULL };
-static const char *screenshotSave[] = { "spectacle", "--region", "--background", NULL };
+static const char *screenshotClipboard[] = { "grimshot", "copy", "area", NULL };
+static const char *screenshotSave[] = { "grimshot", "save", "area", NULL };
+//static const char *screenshotClipboard[] = { "spectacle", "--region", "--background", "--copy-image", NULL };
+//static const char *screenshotSave[] = { "spectacle", "--region", "--background", NULL };
 static const char *emacsclient[] = { "emacsclient", "-c" , "-a","\'emacs\'", NULL };
 
 #include "shiftview.c"
@@ -192,8 +199,8 @@ static const Keychord keychords[] = {
 	{ 3, {{MODKEY, XKB_KEY_g}, {MOD_CONTROL, XKB_KEY_o}, {MOD_NONE,XKB_KEY_n}},incovgaps,     {.i = -1 } },
 	{ 1, {{MODKEY|MOD_SHIFT, XKB_KEY_Return}},       zoom,             {0} },
 	{ 1, {{MODKEY, XKB_KEY_Tab}},                    view,             {0} },
-	{ 1, {{MODKEY, XKB_KEY_u}},                      shiftview,      { .i = -1 } },
-	{ 1, {{MODKEY, XKB_KEY_l}},                      shiftview,      { .i = 1 } },
+	{ 1, {{MODKEY, XKB_KEY_l}},                      shiftview,      { .i = -1 } },
+	{ 1, {{MODKEY, XKB_KEY_u}},                      shiftview,      { .i = 1 } },
 	{ 1, {{MODKEY, XKB_KEY_q}},                      killclient,       {0} },
 	{ 1, {{MODKEY, XKB_KEY_t}},                      setlayout,        {.v = &layouts[0]} },
 	{ 1, {{MODKEY, XKB_KEY_f}},                      setlayout,        {.v = &layouts[1]} },
